@@ -1,24 +1,34 @@
-import React from 'react';
-import logo from './logo.svg';
-import './App.css';
+import { useState } from "react";
+import "./App.sass";
+import { Map, SearchBar } from "./components";
 
 function App() {
+  const [searchValue, setSearchValue] = useState("");
+  const [isMapFullScreen, setIsMapFullScreen] = useState(false);
+
+  function handleSearchBarChange(inputValue: string) {
+    setSearchValue(inputValue);
+  }
+
+  function handleFullScreenChange() {
+    setIsMapFullScreen((isMapFullScreen) => !isMapFullScreen);
+  }
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div className="app">
+      <h1>Navimap</h1>
+
+      <SearchBar inputValue={searchValue} onChange={handleSearchBarChange} />
+      <div
+        className={`map__container ${
+          isMapFullScreen ? "map__container_fullscreen" : ""
+        }`}
+      >
+        <Map isFullScreen={isMapFullScreen} />
+        <button onClick={handleFullScreenChange} className="map__full-screen">
+          []
+        </button>
+      </div>
     </div>
   );
 }
