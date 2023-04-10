@@ -20,14 +20,10 @@ function App() {
 
       <SearchBar inputValue={searchValue} onChange={handleSearchBarChange} />
       <div
-        className={`map__container ${
-          isMapFullScreen ? "map__container_fullscreen" : ""
-        }`}
+        className={`map__container ${isMapFullScreen ? "map__container_fullscreen" : ""
+          }`}
       >
-        <Map isFullScreen={isMapFullScreen} />
-        <button onClick={handleFullScreenChange} className="map__full-screen">
-          []
-        </button>
+        <Map />
       </div>
     </div>
   );
