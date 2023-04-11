@@ -25,6 +25,8 @@ import {
 } from '@react-google-maps/api'
 import { useEffect, useRef, useState } from 'react';
 
+import { route1 } from '../../const';
+
 // const geoJsonSample = {
 //   type: "FeatureCollection",
 //   features: [
@@ -50,11 +52,8 @@ import { useEffect, useRef, useState } from 'react';
 //   ],
 // };
 
-// AIzaSyCugbGc3zbK27-z6YRcwJlZlZ6JAWZca3Q
-
-console.log(process.env.REACT_APP_GOOGLE_MAPS_API_KEY);
-
 const center = { lat: 42.87450384044511, lng: -8.550545894973958 };
+const finalPoint = { lat: 42.87460886355862, lng: -8.549409009048727 };
 
 interface CustomDirectionsWaypoint extends google.maps.DirectionsWaypoint {
   name: string;
@@ -68,82 +67,117 @@ const Map = (props: any) => {
     libraries: ['places'],
   })
 
+  const [position, setPosition] = useState<GeolocationPosition | null>(null);
+
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [directionsResponse1, setDirectionsResponse1] = useState<google.maps.DirectionsResult | null>(null);
   const [directionsResponse2, setDirectionsResponse2] = useState<google.maps.DirectionsResult | null>(null);
+  const [directionsResponse3, setDirectionsResponse3] = useState<google.maps.DirectionsResult | null>(null);
 
   const [waypoints, setWaypoints] = useState<CustomDirectionsWaypoint[]>([]);
 
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
 
+  const [selectedRoute, setSelectedRoute] = useState<number[][] | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<CustomDirectionsWaypoint | null>(null);
 
   const originRef = useRef<HTMLInputElement>(null)
   const destiantionRef = useRef<HTMLInputElement>(null)
 
-  const originRef2 = useRef<HTMLInputElement>(null)
-  const destiantionRef2 = useRef<HTMLInputElement>(null)
+  const onLoad = (map: google.maps.Map) => setMap(map)
 
-  async function calculateRoute() {
-    if (!originRef.current || !destiantionRef.current) {
+  function findClosestPoint(array: Array<[number, number]>, point: [number, number]) {
+    let closestPointIndex = 0;
+    let minDistance = calculateDistance(array[closestPointIndex], point);
+    let closestPoint = array[0];
+
+    for (let i = 1; i < array.length; i++) {
+      const currentPoint = array[i];
+      const currentDistance = calculateDistance(currentPoint, point);
+      if (currentDistance < minDistance) {
+        closestPoint = currentPoint;
+        closestPointIndex = i;
+        minDistance = currentDistance;
+      }
+    }
+
+    return { closestPoint, closestPointIndex };
+  }
+
+  function calculateDistance(point1: [number, number], point2: [number, number]) {
+    const dx = point1[0] - point2[0];
+    const dy = point1[1] - point2[1];
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  async function calculateRoute(startingPoint: [number, number], endPoint: [number, number]) {
+    // if (!originRef.current || !destiantionRef.current) {
+    //   return;
+    // }
+
+    // if (originRef.current.value === '' || destiantionRef.current.value === '') {
+    //   return
+    // }
+
+    const { closestPoint: closestStartingBusStop, closestPointIndex: closestStartingBusStopIndex } = findClosestPoint(route1, startingPoint);
+    const { closestPoint: closestEndBusStop, closestPointIndex: closestEndBusStopIndex } = findClosestPoint(route1, endPoint);
+
+
+    if (!position) {
       return;
     }
 
-    if (originRef.current.value === '' || destiantionRef.current.value === '') {
-      return
+    const directionsService = new google.maps.DirectionsService()
+
+    // Walking 1
+    const results1 = await directionsService.route({
+      origin: new google.maps.LatLng(startingPoint[0], startingPoint[1]),
+      destination: new google.maps.LatLng(closestStartingBusStop[0], closestStartingBusStop[1]),
+      travelMode: google.maps.TravelMode.WALKING
+    })
+
+    const distance1 = results1.routes[0].legs[0].distance?.text;
+    setDirectionsResponse1(results1);
+
+    let isReversedWaypoints = false;
+
+    if (closestEndBusStopIndex < closestStartingBusStopIndex) {
+      isReversedWaypoints = true;
     }
 
-    // eslint-disable-next-line no-undef
-    const directionsService = new google.maps.DirectionsService()
-    const results1 = await directionsService.route({
-      // origin: originRef.current.value,
-      // destination: destiantionRef.current.value,
-      // // eslint-disable-next-line no-undef
-      // travelMode: google.maps.TravelMode.DRIVING,
+    let slicedWaypoints: CustomDirectionsWaypoint[] = [];
 
-      // [-8.552961940162687, 42.87341293411154],
-      //           [-8.551182481326894, 42.8749081257974],
-      //           [-8.55035056828158, 42.87544688695417],
-      //           [-8.547783614106944, 42.87642081723467],
-      origin: new google.maps.LatLng(42.87341293411154, -8.552961940162687),
-      destination: new google.maps.LatLng(42.87642081723467, -8.547783614106944),
-      waypoints: waypoints.map(({ name, ...waypoint }) => { return waypoint }),
+    if (isReversedWaypoints) {
+      slicedWaypoints = waypoints.slice(closestEndBusStopIndex, closestStartingBusStopIndex).reverse();
+    } else {
+      slicedWaypoints = waypoints.slice(closestStartingBusStopIndex, closestEndBusStopIndex);
+    }
+
+    console.log(slicedWaypoints);
+
+    // Driving 2
+    const results2 = await directionsService.route({
+      origin: new google.maps.LatLng(closestStartingBusStop[0], closestStartingBusStop[1]),
+      destination: new google.maps.LatLng(closestEndBusStop[0], closestEndBusStop[1]),
+      waypoints: slicedWaypoints.map(({ name, ...waypoint }) => { return waypoint }),
       travelMode: google.maps.TravelMode.DRIVING
     })
 
-    setDirectionsResponse1(results1)
+    const distance2 = results2.routes[0].legs[0].distance?.text;
+    setDirectionsResponse2(results2)
+    // setDistance(distance);
+    // setDuration(results2.routes[0].legs[0].duration?.text || "");
 
-    if (results1 == null || results1 == undefined) {
-      return;
-    }
-
-    if (!results1.routes) {
-      return;
-    }
-
-    const distance = results1.routes[0].legs[0].distance?.text || "";
-
-    setDistance(distance);
-    setDuration(results1.routes[0].legs[0].duration?.text || "");
-
-    if (!originRef2.current || !destiantionRef2.current) {
-      return;
-    }
-
-    if (originRef2.current.value === '' || destiantionRef2.current.value === '') {
-      return
-    }
-
-    const results2 = await directionsService.route({
-      origin: originRef2.current.value,
-      destination: destiantionRef2.current.value,
-      // eslint-disable-next-line no-undef
-      travelMode: google.maps.TravelMode.DRIVING,
+    // Walking 3
+    const results3 = await directionsService.route({
+      origin: new google.maps.LatLng(closestEndBusStop[0], closestEndBusStop[1]),
+      destination: new google.maps.LatLng(endPoint[0], endPoint[1]),
+      travelMode: google.maps.TravelMode.WALKING
     })
 
-    setDirectionsResponse2(results2)
-
+    const distance3 = results3.routes[0].legs[0].distance?.text;
+    setDirectionsResponse3(results3);
   }
 
   useEffect(() => {
@@ -151,74 +185,134 @@ const Map = (props: any) => {
       return;
     }
 
-    const newWaypoints = [
-      {
-        name: "Parada 1",
-        location: new google.maps.LatLng(42.87544688695417, -8.55035056828158),
-        stopover: false,
+    setSelectedRoute(route1);
+
+  }, [isLoaded])
+
+  useEffect(() => {
+    if (!selectedRoute) {
+      return;
+    }
+
+    const newWaypoints = route1.slice(1, route1.length - 1).map((stop) => {
+      return {
+        name: "",
+        location: new google.maps.LatLng(stop[0], stop[1]),
+        stopover: true
       }
-    ];
+    });
 
     setWaypoints(newWaypoints);
 
-  }, [window.google])
+    const watchId = navigator.geolocation.watchPosition(
+      position => setPosition(position),
+      error => console.error(error)
+    );
 
-  useEffect(() => {
-    console.log(waypoints.map((waypoint) => { return { location: waypoint.location } }));
-  }, [waypoints])
+    return () => navigator.geolocation.clearWatch(watchId);
+
+  }, [selectedRoute])
+
+  function findClosestPointForCurrentPosition() {
+    if (!position) {
+      return;
+    }
+
+    console.log(findClosestPoint(route1 as [number, number][], [position.coords.latitude, position.coords.longitude]), route1.length);
+    console.log(findClosestPoint(route1 as [number, number][], [finalPoint.lat, finalPoint.lng]), route1.length);
+  }
+
+  // const getStrokeColor = (legs?: google.maps.DirectionsLeg[]) => {
+  //   const colors: Record<string, string> = {
+  //     DRIVING: '#FF0000', // Red
+  //     WALKING: '#008000', // Green
+  //     BICYCLING: '#0000FF', // Blue
+  //     TRANSIT: '#FFA500', // Orange
+  //   };
+
+  //   return colors[leg?.steps[0]?.travel_mode] || '#000000';
+  // };
+
+  // const options: google.maps.DirectionsRendererOptions = {
+  //   polylineOptions: {
+  //     strokeColor: getStrokeColor(directionsResponse?.routes[0]?.legs),
+  //   },
+  // };
 
   return (
     <>
-      {isLoaded ? <><Autocomplete>
-        <Input type='text' placeholder='Origin' value={"Turismo de Santiago, Rúa do Vilar, Santiago de Compostela, España"} ref={originRef} />
-      </Autocomplete>
-        <Autocomplete>
-          <Input
-            type='text'
-            placeholder='Destination'
-            value={"Santiago de Compostela, España"}
-            ref={destiantionRef}
-          />
-        </Autocomplete>
-        <Autocomplete>
-          <Input type='text' placeholder='Origin2' ref={originRef2} />
-        </Autocomplete>
-        <Autocomplete>
-          <Input
-            type='text'
-            placeholder='Destination2'
-            ref={destiantionRef2}
-          />
-        </Autocomplete>
-        <Button onClick={calculateRoute}>Calculate</Button>
-        <GoogleMap
-          center={center}
-          zoom={15}
-          mapContainerStyle={{ width: '100%', height: '500px' }}
-          options={{
-            zoomControl: false,
-            streetViewControl: false,
-            mapTypeControl: false,
-            fullscreenControl: true,
-          }}
-          onLoad={map => setMap(map)}
-        >
-          <Marker position={center} />
-          {directionsResponse1 && (
-            <DirectionsRenderer directions={directionsResponse1} />
-          )}
-          {directionsResponse2 && (
-            <DirectionsRenderer directions={directionsResponse2} />
-          )}
-          {waypoints && waypoints.map((waypoint) => {
-            return <Marker label={waypoint.name} position={waypoint.location as google.maps.LatLng} onClick={() => setSelectedMarker(waypoint)}></Marker>
-          })}
-          {selectedMarker && (
-            <InfoWindow position={selectedMarker.location} onCloseClick={() => setSelectedMarker(null)}>
-              {/* <div>{selectedMarker.name}</div> */}
-            </InfoWindow>
-          )}
-        </GoogleMap></> : "Map is loading"}
+      {
+        isLoaded ? <>
+          <Autocomplete>
+            <Input type='text' placeholder='Origin' ref={originRef} />
+          </Autocomplete>
+          <Autocomplete>
+            <Input
+              type='text'
+              placeholder='Destination'
+              ref={destiantionRef}
+            />
+          </Autocomplete>
+          <Button onClick={() => calculateRoute([position?.coords.latitude!, position?.coords.longitude!], [finalPoint.lat, finalPoint.lng])}>Calculate</Button>
+          <Button onClick={findClosestPointForCurrentPosition}>Closest point for current pos</Button>
+
+          <GoogleMap
+            center={center}
+            zoom={15}
+            mapContainerStyle={{ width: '100%', height: '500px' }}
+            options={{
+              zoomControl: false,
+              streetViewControl: false,
+              mapTypeControl: false,
+              fullscreenControl: true,
+            }}
+            onLoad={onLoad}
+          >
+            {
+              map && <>
+                {
+                  directionsResponse1 && (
+                    <DirectionsRenderer directions={directionsResponse1} />
+                  )
+                }
+                {
+                  directionsResponse2 && (
+                    <DirectionsRenderer options={{
+                      polylineOptions: {
+                        strokeColor: "#FFA500",
+                      }
+                    }} directions={directionsResponse2} />
+                  )
+                }
+                {
+                  directionsResponse3 && (
+                    <DirectionsRenderer directions={directionsResponse3} />
+                  )
+                }
+                {
+                  selectedMarker && (
+                    <InfoWindow position={selectedMarker.location} onCloseClick={() => setSelectedMarker(null)} >
+                      <div>{selectedMarker.name}</div>
+                    </InfoWindow>
+                  )
+                }
+                {position?.coords && (
+                  <Marker position={
+                    {
+                      lat: position?.coords.latitude,
+                      lng: position?.coords.longitude
+                    }
+                  }></Marker>
+                )}
+              </>
+            }
+          </GoogleMap>
+          <p>{distance}</p>
+          <p>{duration}</p>
+          <p>{position?.coords.latitude}</p>
+          <p>{position?.coords.longitude}</p>
+        </> : "Map is loading"
+      }
     </>
     // <PigeonMaps
     //   provider={maptilerProvider}
