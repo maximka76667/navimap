@@ -26,6 +26,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 
 import { route1 } from '../../const';
+import BusStopIcon from '../../images/bus-stop.png';
 
 // const geoJsonSample = {
 //   type: "FeatureCollection",
@@ -53,7 +54,7 @@ import { route1 } from '../../const';
 // };
 
 const center = { lat: 42.87450384044511, lng: -8.550545894973958 };
-const finalPoint = { lat: 42.87460886355862, lng: -8.549409009048727 };
+const finalPoint = [42.87346711380447, -8.554817486782008];
 
 interface CustomDirectionsWaypoint extends google.maps.DirectionsWaypoint {
   name: string;
@@ -198,7 +199,7 @@ const Map = (props: any) => {
       return {
         name: "",
         location: new google.maps.LatLng(stop[0], stop[1]),
-        stopover: true
+        stopover: false
       }
     });
 
@@ -219,7 +220,7 @@ const Map = (props: any) => {
     }
 
     console.log(findClosestPoint(route1 as [number, number][], [position.coords.latitude, position.coords.longitude]), route1.length);
-    console.log(findClosestPoint(route1 as [number, number][], [finalPoint.lat, finalPoint.lng]), route1.length);
+    console.log(findClosestPoint(route1 as [number, number][], [finalPoint[0], finalPoint[1]]), route1.length);
   }
 
   // const getStrokeColor = (legs?: google.maps.DirectionsLeg[]) => {
@@ -253,7 +254,7 @@ const Map = (props: any) => {
               ref={destiantionRef}
             />
           </Autocomplete>
-          <Button onClick={() => calculateRoute([position?.coords.latitude!, position?.coords.longitude!], [finalPoint.lat, finalPoint.lng])}>Calculate</Button>
+          <Button onClick={() => calculateRoute([position?.coords.latitude!, position?.coords.longitude!], [finalPoint[0], finalPoint[1]])}>Calculate</Button>
           <Button onClick={findClosestPointForCurrentPosition}>Closest point for current pos</Button>
 
           <GoogleMap
@@ -272,7 +273,9 @@ const Map = (props: any) => {
               map && <>
                 {
                   directionsResponse1 && (
-                    <DirectionsRenderer directions={directionsResponse1} />
+                    <DirectionsRenderer directions={directionsResponse1} options={{
+                      suppressMarkers: true
+                    }} />
                   )
                 }
                 {
@@ -280,13 +283,23 @@ const Map = (props: any) => {
                     <DirectionsRenderer options={{
                       polylineOptions: {
                         strokeColor: "#FFA500",
-                      }
+                      },
+                      suppressMarkers: false,
+                      markerOptions: {
+                        icon: {
+                          url: BusStopIcon,
+                          scaledSize: new window.google.maps.Size(20, 20),
+                          anchor: new window.google.maps.Point(0, 20) // adjust as needed
+                        },
+                      },
                     }} directions={directionsResponse2} />
                   )
                 }
                 {
                   directionsResponse3 && (
-                    <DirectionsRenderer directions={directionsResponse3} />
+                    <DirectionsRenderer directions={directionsResponse3} options={{
+                      suppressMarkers: true
+                    }} />
                   )
                 }
                 {
