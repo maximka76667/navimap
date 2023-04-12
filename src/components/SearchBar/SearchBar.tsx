@@ -1,7 +1,7 @@
 import React, { ChangeEventHandler } from "react";
-import { ISearchBarProps } from "../../interfaces";
+import SearchBarProps from "./SearchBarProps";
 
-function SearchBar({ onChange, inputValue }: ISearchBarProps) {
+function SearchBar({ onChange, inputValue }: SearchBarProps) {
   const handleInputChange: ChangeEventHandler<HTMLInputElement> = (e) => {
     const inputValue = e.target.value;
     onChange(inputValue);

@@ -1,8 +1,6 @@
-// import { Map as PigeonMaps, Marker, GeoJson } from "pigeon-maps";
-// import { maptiler } from "pigeon-maps/providers";
+import { useEffect, useRef, useState } from 'react';
 
-// const maptilerProvider = maptiler("eUiw0ywy36om1CkHb3VF", "streets");
-
+// UI
 import {
   Box,
   Button,
@@ -15,6 +13,7 @@ import {
   Text,
 } from '@chakra-ui/react'
 
+// React Google Maps API
 import {
   useJsApiLoader,
   GoogleMap,
@@ -23,35 +22,22 @@ import {
   InfoWindow,
   DirectionsRenderer,
 } from '@react-google-maps/api'
-import { useEffect, useRef, useState } from 'react';
 
-import { route1 } from '../../const';
+// Constants
+import {
+  route1,
+  GOOGLE_MAPS_LIBRARIES,
+  WALKING_DIRECTIONS_RENDERER_OPTIONS
+} from '../../constants';
+
+// Images
 import BusStopIcon from '../../images/bus-stop.png';
 
-// const geoJsonSample = {
-//   type: "FeatureCollection",
-//   features: [
-//     {
-//       type: "Feature",
-//       geometry: {
-//         type: "Point",
-//         coordinates: [-8.550545894973958, 42.87450384044511],
-//       },
-//     },
-//     {
-//       type: "Feature",
-//       geometry: {
-//         type: "LineString",
-//         coordinates: [
-//           [-8.552961940162687, 42.87341293411154],
-//           [-8.551182481326894, 42.8749081257974],
-//           [-8.55035056828158, 42.87544688695417],
-//           [-8.547783614106944, 42.87642081723467],
-//         ],
-//       },
-//     },
-//   ],
-// };
+// Interfaces
+import { IBusStop, ICoords, IRoute } from '../../interfaces';
+
+// Components
+import AutocompleteInput from '../AutocompleteInput/AutocompleteInput';
 
 const center = { lat: 42.87450384044511, lng: -8.550545894973958 };
 const finalPoint = [42.87346711380447, -8.554817486782008];
@@ -65,7 +51,7 @@ const Map = (props: any) => {
 
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places'],
+    libraries: GOOGLE_MAPS_LIBRARIES,
   })
 
   const [position, setPosition] = useState<GeolocationPosition | null>(null);
@@ -80,7 +66,7 @@ const Map = (props: any) => {
   const [distance, setDistance] = useState('');
   const [duration, setDuration] = useState('');
 
-  const [selectedRoute, setSelectedRoute] = useState<number[][] | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<IRoute | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<CustomDirectionsWaypoint | null>(null);
 
   const originRef = useRef<HTMLInputElement>(null)
@@ -88,13 +74,13 @@ const Map = (props: any) => {
 
   const onLoad = (map: google.maps.Map) => setMap(map)
 
-  function findClosestPoint(array: Array<[number, number]>, point: [number, number]) {
+  function findClosestPoint(array: IBusStop[], point: ICoords) {
     let closestPointIndex = 0;
-    let minDistance = calculateDistance(array[closestPointIndex], point);
-    let closestPoint = array[0];
+    let minDistance = calculateDistance(array[closestPointIndex].location, point);
+    let closestPoint = array[0].location;
 
     for (let i = 1; i < array.length; i++) {
-      const currentPoint = array[i];
+      const currentPoint = array[i].location;
       const currentDistance = calculateDistance(currentPoint, point);
       if (currentDistance < minDistance) {
         closestPoint = currentPoint;
@@ -106,13 +92,13 @@ const Map = (props: any) => {
     return { closestPoint, closestPointIndex };
   }
 
-  function calculateDistance(point1: [number, number], point2: [number, number]) {
+  function calculateDistance(point1: ICoords, point2: ICoords) {
     const dx = point1[0] - point2[0];
     const dy = point1[1] - point2[1];
     return Math.sqrt(dx * dx + dy * dy);
   }
 
-  async function calculateRoute(startingPoint: [number, number], endPoint: [number, number]) {
+  async function calculateRoute(startingPoint: ICoords, endPoint: ICoords) {
     // if (!originRef.current || !destiantionRef.current) {
     //   return;
     // }
@@ -121,9 +107,8 @@ const Map = (props: any) => {
     //   return
     // }
 
-    const { closestPoint: closestStartingBusStop, closestPointIndex: closestStartingBusStopIndex } = findClosestPoint(route1, startingPoint);
-    const { closestPoint: closestEndBusStop, closestPointIndex: closestEndBusStopIndex } = findClosestPoint(route1, endPoint);
-
+    const { closestPoint: closestStartingBusStop, closestPointIndex: closestStartingBusStopIndex } = findClosestPoint(route1.route, startingPoint);
+    const { closestPoint: closestEndBusStop, closestPointIndex: closestEndBusStopIndex } = findClosestPoint(route1.route, endPoint);
 
     if (!position) {
       return;
@@ -157,6 +142,16 @@ const Map = (props: any) => {
 
     console.log(slicedWaypoints);
 
+    // Walking 3
+    const results3 = await directionsService.route({
+      origin: new google.maps.LatLng(closestEndBusStop[0], closestEndBusStop[1]),
+      destination: new google.maps.LatLng(endPoint[0], endPoint[1]),
+      travelMode: google.maps.TravelMode.WALKING
+    })
+
+    const distance3 = results3.routes[0].legs[0].distance?.text;
+    setDirectionsResponse3(results3);
+
     // Driving 2
     const results2 = await directionsService.route({
       origin: new google.maps.LatLng(closestStartingBusStop[0], closestStartingBusStop[1]),
@@ -169,16 +164,6 @@ const Map = (props: any) => {
     setDirectionsResponse2(results2)
     // setDistance(distance);
     // setDuration(results2.routes[0].legs[0].duration?.text || "");
-
-    // Walking 3
-    const results3 = await directionsService.route({
-      origin: new google.maps.LatLng(closestEndBusStop[0], closestEndBusStop[1]),
-      destination: new google.maps.LatLng(endPoint[0], endPoint[1]),
-      travelMode: google.maps.TravelMode.WALKING
-    })
-
-    const distance3 = results3.routes[0].legs[0].distance?.text;
-    setDirectionsResponse3(results3);
   }
 
   useEffect(() => {
@@ -195,10 +180,12 @@ const Map = (props: any) => {
       return;
     }
 
-    const newWaypoints = route1.slice(1, route1.length - 1).map((stop) => {
+    const busStops = route1.route;
+
+    const newWaypoints = busStops.slice(1, busStops.length - 1).map(({ name, location }) => {
       return {
-        name: "",
-        location: new google.maps.LatLng(stop[0], stop[1]),
+        name,
+        location: new google.maps.LatLng(location[0], location[1]),
         stopover: false
       }
     });
@@ -219,8 +206,8 @@ const Map = (props: any) => {
       return;
     }
 
-    console.log(findClosestPoint(route1 as [number, number][], [position.coords.latitude, position.coords.longitude]), route1.length);
-    console.log(findClosestPoint(route1 as [number, number][], [finalPoint[0], finalPoint[1]]), route1.length);
+    console.log(findClosestPoint(route1.route, [position.coords.latitude, position.coords.longitude]), route1.route.length);
+    console.log(findClosestPoint(route1.route, [finalPoint[0], finalPoint[1]]), route1.route.length);
   }
 
   // const getStrokeColor = (legs?: google.maps.DirectionsLeg[]) => {
@@ -244,16 +231,8 @@ const Map = (props: any) => {
     <>
       {
         isLoaded ? <>
-          <Autocomplete>
-            <Input type='text' placeholder='Origin' ref={originRef} />
-          </Autocomplete>
-          <Autocomplete>
-            <Input
-              type='text'
-              placeholder='Destination'
-              ref={destiantionRef}
-            />
-          </Autocomplete>
+          <AutocompleteInput placeholder='Origin' ref={originRef} />
+          <AutocompleteInput placeholder='Destination' ref={destiantionRef} />
           <Button onClick={() => calculateRoute([position?.coords.latitude!, position?.coords.longitude!], [finalPoint[0], finalPoint[1]])}>Calculate</Button>
           <Button onClick={findClosestPointForCurrentPosition}>Closest point for current pos</Button>
 
@@ -272,15 +251,19 @@ const Map = (props: any) => {
             {
               map && <>
                 {
+
                   directionsResponse1 && (
-                    <DirectionsRenderer directions={directionsResponse1} options={{
-                      suppressMarkers: true
-                    }} />
+                    <DirectionsRenderer directions={directionsResponse1} options={WALKING_DIRECTIONS_RENDERER_OPTIONS} />
+                  )
+                }
+                {
+                  directionsResponse3 && (
+                    <DirectionsRenderer directions={directionsResponse3} options={WALKING_DIRECTIONS_RENDERER_OPTIONS} />
                   )
                 }
                 {
                   directionsResponse2 && (
-                    <DirectionsRenderer options={{
+                    <DirectionsRenderer directions={directionsResponse2} options={{
                       polylineOptions: {
                         strokeColor: "#FFA500",
                       },
@@ -288,17 +271,10 @@ const Map = (props: any) => {
                       markerOptions: {
                         icon: {
                           url: BusStopIcon,
-                          scaledSize: new window.google.maps.Size(20, 20),
-                          anchor: new window.google.maps.Point(0, 20) // adjust as needed
+                          scaledSize: new google.maps.Size(20, 20),
+                          anchor: new google.maps.Point(0, 20) // adjust as needed
                         },
                       },
-                    }} directions={directionsResponse2} />
-                  )
-                }
-                {
-                  directionsResponse3 && (
-                    <DirectionsRenderer directions={directionsResponse3} options={{
-                      suppressMarkers: true
                     }} />
                   )
                 }
@@ -322,34 +298,9 @@ const Map = (props: any) => {
           </GoogleMap>
           <p>{distance}</p>
           <p>{duration}</p>
-          <p>{position?.coords.latitude}</p>
-          <p>{position?.coords.longitude}</p>
-        </> : "Map is loading"
+        </> : "Map is loading..."
       }
     </>
-    // <PigeonMaps
-    //   provider={maptilerProvider}
-    //   height={isFullScreen ? 750 : 500}
-    //   defaultCenter={[42.87, -8.55]}
-    //   defaultZoom={15}
-    // >
-    //   <GeoJson
-    //     data={geoJsonSample}
-    //     styleCallback={(feature: any, hover: any) => {
-    //       if (feature.geometry.type === "LineString") {
-    //         return {strokeWidth: "4", stroke: "black" };
-    //       }
-    //       return {
-    //         fill: "#d4e6ec99",
-    //         strokeWidth: "1",
-    //         stroke: "white",
-    //         r: "20",
-    //       };
-    //     }}
-    //   />
-    //   <Marker width={40} anchor={[42.87341293411154, -8.552961940162687]} />
-    //   <Marker width={40} anchor={[42.87642081723467, -8.547783614106944]} />
-    // </PigeonMaps >
   );
 };
 
