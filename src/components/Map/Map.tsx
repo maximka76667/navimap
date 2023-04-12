@@ -198,7 +198,6 @@ const Map = (props: any) => {
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-
   }, [selectedRoute])
 
   function findClosestPointForCurrentPosition() {
